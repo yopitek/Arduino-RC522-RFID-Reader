@@ -1,0 +1,64 @@
+#include <MFRC522.h>
+#define RST_PIN 9
+#define SS_PIN 10 // 模組上的 SDA 接腳
+MFRC522 mfrc522; // 建立 MFRC522 實體
+
+void setup() {
+Serial.begin(9600);
+SPI.begin(); // 初始化 SPI 介面
+mfrc522.PCD_Init(SS_PIN, RST_PIN); // 初始化 MFRC522 卡
+Serial.print(F("Reader "));
+Serial.print(F(": "));
+mfrc522.PCD_DumpVersionToSerial(); // 顯示讀卡設備的版本
+}
+
+void loop() {
+// 檢查是否是一張新的卡
+if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
+// 顯示原始 UID
+Serial.print(F("Card UID: "));
+dump_byte_array(mfrc522.uid.uidByte, mfrc522.uid.size); // 顯示卡片的 UID
+Serial.println();
+
+// 顯示 6 位 16 進制反向排列的 UID 前三字節
+Serial.print(F("6-digit Hex Reversed First 3 Bytes UID: "));
+String hexUID = get6DigitHexReversedUID(mfrc522.uid.uidByte, mfrc522.uid.size);
+Serial.println(hexUID);
+
+Serial.print(F("PICC type: "));
+MFRC522::PICC_Type piccType = mfrc522.PICC_GetType(mfrc522.uid.sak);
+Serial.println(mfrc522.PICC_GetTypeName(piccType)); // 顯示卡片的類型
+mfrc522.PICC_HaltA(); // 卡片進入停止模式
+}
+}
+
+/**
+* 這個副程式把讀取到的 UID，用 16 進位顯示出來
+*/
+void dump_byte_array(byte *buffer, byte bufferSize) {
+for (byte i = 0; i < bufferSize; i++) {
+Serial.print(buffer[i] < 0x10 ? " 0" : " ");
+Serial.print(buffer[i], HEX);
+}
+}
+
+/**
+* 將 UID 的前三個字節反向排列並以 16 進制大寫顯示
+*/
+String get6DigitHexReversedUID(byte *buffer, byte bufferSize) {
+if (bufferSize < 3) {
+return "Error: Insufficient bytes"; // 確保至少有 3 字節
+}
+
+// 取 UID 的前三個字節並反向排列
+String reversedUID = "";
+for (int i = 2; i >= 0; i--) { // 反向遍歷前三個字節
+if (buffer[i] < 0x10) {
+reversedUID += "0"; // 補零確保兩位顯示
+}
+reversedUID += String(buffer[i], HEX);
+}
+
+reversedUID.toUpperCase(); // 將結果轉為大寫
+return reversedUID;
+}
