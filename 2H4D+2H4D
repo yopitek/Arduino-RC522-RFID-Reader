@@ -1,0 +1,68 @@
+#include <SPI.h>
+#include <MFRC522.h>
+
+#define RST_PIN 9
+#define SS_PIN 10 // 模組上的 SDA 接腳
+
+MFRC522 mfrc522(SS_PIN, RST_PIN); // 建立 MFRC522 實體
+
+void setup() {
+Serial.begin(9600);
+SPI.begin(); // 初始化 SPI 介面
+mfrc522.PCD_Init(); // 初始化 MFRC522 卡
+Serial.println(F("Reader Initialized"));
+mfrc522.PCD_DumpVersionToSerial(); // 顯示讀卡設備的版本
+}
+
+void loop() {
+// 檢查是不是一張新的卡
+if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
+// 顯示卡片 UID
+Serial.print(F("Card UID: "));
+String cardUID = getCardUID(mfrc522.uid.uidByte, mfrc522.uid.size);
+Serial.println(cardUID);
+
+// 卡號轉換
+String newCardNumber = convertCardNumber(mfrc522.uid.uidByte, mfrc522.uid.size);
+Serial.print(F("New card number: "));
+Serial.println(newCardNumber);
+
+// 停止卡片通信
+mfrc522.PICC_HaltA();
+}
+}
+
+// 獲取卡片 UID 並轉換為字符串格式
+String getCardUID(byte *buffer, byte bufferSize) {
+String uid = "";
+for (byte i = 0; i < bufferSize; i++) {
+if (buffer[i] < 0x10) {
+uid += "0"; // 補零
+}
+uid += String(buffer[i], HEX); // 轉換為 16 進制
+}
+uid.toUpperCase(); // UID 字母大寫
+return uid;
+}
+
+// 卡號轉換函數
+String convertCardNumber(byte *buffer, byte bufferSize) {
+// 1. 將 UID 字節按正確順序組合成 32 位整數
+unsigned long cardDecimal = 0;
+for (int i = bufferSize - 1; i >= 0; i--) { // 反向組合
+cardDecimal = (cardDecimal << 8) | buffer[i];
+}
+
+// 2. 將 32 位整數分為高 16 位和低 16 位
+unsigned long highPart = (cardDecimal >> 16) & 0xFFFF; // 高 16 位
+unsigned long lowPart = cardDecimal & 0xFFFF; // 低 16 位
+
+// 3. 將高低部分分別轉回十進制
+unsigned long highDecimal = highPart;
+unsigned long lowDecimal = lowPart;
+
+// 4. 拼接為新的卡號
+String newCardNumber = String(highDecimal) + String(lowDecimal);
+
+return newCardNumber;
+}
